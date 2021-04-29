@@ -34,6 +34,8 @@ namespace CampbellDAT
         /// <param name="filePath">The path of the file to open.</param>
         public CampbellFile(string filePath)
         {
+#warning CardConvert can produce TOB1 files. The software is part of the LoggerNet software package.
+
             if (!BitConverter.IsLittleEndian)
                 throw new Exception("This library works only on little endian systems.");
 
