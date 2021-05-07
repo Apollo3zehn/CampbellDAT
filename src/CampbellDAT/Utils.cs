@@ -37,6 +37,8 @@ namespace CampbellDAT
                 "ASCII"     => (int.Parse(dataType.Substring(6, dataType.Length - 6 - 1)), typeof(string)),
                 _           => throw new Exception($"Unsupported data type '{dataType}'.")
             };
+
+#warning More types here (CRBasic): https://help.campbellsci.com/crbasic/cr1000x/#Instructions/sample.htm?Highlight=Sample Is BOOLX correctly implemented?
         }
 
         public static T SwitchEndianness<T>(T value) where T : unmanaged

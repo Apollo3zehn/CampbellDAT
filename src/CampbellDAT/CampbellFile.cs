@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -12,6 +13,21 @@ namespace CampbellDAT
 {
     // TOB1, TOB2 or TOB3
     // https://github.com/ansell/camp2ascii
+    // Loggers are programmed with CRBasic (https://help.campbellsci.com/crbasic/cr1000x/)
+    // File size may be determined by (look for >>>> and <<<<):
+    //
+    // DataTable(name, 1, -1)
+    //     TableFile("CRD:tableName", 64, 100, 0, >>>>60, Min<<<<, flag1, flag2)
+    //     ...
+    // EndTable
+    //
+    // BeginProg
+    //     ' 0 = loop forever
+    //     Scan(>>>>50, mSec<<<<, 1000, 0)
+    //         ....
+    //     NextScan
+    //     ....
+    // EndProg
     
     /// <summary>
     /// An in-memory representation of a Campbell TOB file.
@@ -432,12 +448,40 @@ namespace CampbellDAT
 
             for (; i < this.IntendedTableSize; i++)
             {
-                var baseOffset = this.FirstFrameStart + this.FrameSize * i;
-
-                /* header */
+                /* footer */
                 if (this.Format > Format.TOB1)
                 {
-#warning "The timestamp and record number for each record are an optional output in a TOB1 file. If these elements are present, a “SECONDS”, “NANOSECONDS”, and “RECORD” column will be generated as names in the field list of header line two".
+#warning The flags are not validated since they are not part of the specification!
+
+                    var footerOffset = this.FirstFrameStart + this.FrameSize * i + this.FrameSize - this.FrameFooterSize;
+                    accessor.ReadArray(footerOffset, footerBuffer, 0, 4);
+
+                    var offset = ((footerBuffer[1] & 0x07) << 8) + footerBuffer[0];
+                    var fileMark = (footerBuffer[1] & 0x08) > 0;
+                    var cardRemoveAfterThisFrame = (footerBuffer[1] & 0x10) > 0;
+                    var noRecord = (footerBuffer[1] & 0x20) > 0;
+                    var isMinorFrame = (footerBuffer[1] & 0x40) > 0;
+                    var validation = (footerBuffer[3] << 8) + footerBuffer[2];
+
+                    if (this.ValidationStamp != validation)
+                        break;
+
+                    if (cardRemoveAfterThisFrame)
+                        break;
+
+                    if (noRecord)
+                        throw new Exception("Reading incomplete files is not yet supported.");
+
+                    if (isMinorFrame)
+                        throw new Exception("Reading minor frames is not yet supported.");
+                }
+
+                /* header */
+                var baseOffset = this.FirstFrameStart + this.FrameSize * i;
+
+                if (this.Format > Format.TOB1)
+                {
+#warning "The timestamp and record number for each record are an optional output in a TOB1 file. If these elements are present, a "SECONDS", "NANOSECONDS", and "RECORD" column will be generated as names in the field list of header line two".
 
                     var offset = Utils.TO_UNIX_EPOCH + accessor.ReadInt32(baseOffset);
                     var subseconds = accessor.ReadInt32(baseOffset + 4);
@@ -452,41 +496,16 @@ namespace CampbellDAT
                         throw new Exception("Reading unordered frames is not yet supported.");
                 }
 
-                // record number of the frame (could also be used to detect unordered frames)
+                // record number of the frame
                 if (this.Format == Format.TOB3)
                 {
-                    //var number = accessor.ReadInt32(timeOffset + 8);
+                    var recordNumber = accessor.ReadInt32(baseOffset + 8);
                 }
 
                 /* data */
                 var variableOffset = baseOffset + this.FrameHeaderSize + relativeVariableOffset;
 
                 decoder.Invoke(variable, accessor, variableOffset, buffer, i);
-
-                /* footer */
-                if (this.Format > Format.TOB1)
-                {
-#warning The flags are not validated since they are not part of the specification!
-
-                    var footerOffset = this.FirstFrameStart + this.FrameSize * i + this.FrameSize - this.FrameFooterSize;
-                    accessor.ReadArray(footerOffset, footerBuffer, 0, 4);
-
-                    var offset = ((footerBuffer[2] & 0x07) << 8) + footerBuffer[3];
-                    var fileMark = (footerBuffer[2] & 0x08) > 0;
-                    var cardRemoveAfterThisFrame = (footerBuffer[2] & 0x10) > 0;
-                    var noRecord = (footerBuffer[2] & 0x20) > 0;
-                    var isMinorFrame = (footerBuffer[2] & 0x40) > 0;
-                    var validation = (footerBuffer[0] << 8) + footerBuffer[1];
-
-                    if (noRecord)
-                        throw new Exception("Reading incomplete files is not yet supported.");
-
-                    if (isMinorFrame)
-                        throw new Exception("Reading minor frames is not yet supported.");
-
-                    if (!cardRemoveAfterThisFrame)
-                        break;
-                }
             }
 
             if (i < this.IntendedTableSize - 1)
