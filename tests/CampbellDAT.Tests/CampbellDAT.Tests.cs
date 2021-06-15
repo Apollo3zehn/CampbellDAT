@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace CampbellDAT.Tests
@@ -48,7 +49,7 @@ namespace CampbellDAT.Tests
         }
 
         [Fact]
-        public void CanReadData()
+        public void CanReadGeneric()
         {
             // Arrange
             var filePath = "testdata.dat";
@@ -81,6 +82,37 @@ namespace CampbellDAT.Tests
                 Assert.Equal(double.NaN, result3.Data.Buffer[252]);
                 Assert.Equal(double.NaN, result3.Data.Buffer[253]);
                 Assert.Equal(-1.17, result3.Data.Buffer[358], precision: 3);
+            }
+        }
+
+        [Fact]
+        public void CanReadByteArray()
+        {
+            // Arrange
+            var filePath = "testdata.dat";
+
+            // Act
+            using (var campbellFile = new CampbellFile(filePath))
+            {
+                var result2_raw = campbellFile.Read<byte>(campbellFile.Variables[1]);
+                var result3_raw = campbellFile.Read<byte>(campbellFile.Variables[campbellFile.Variables.Count - 2]);
+
+                // Assert
+                var result2 = MemoryMarshal.Cast<byte, float>(result2_raw.Data.Buffer);
+                var result3 = MemoryMarshal.Cast<byte, float>(result3_raw.Data.Buffer);
+
+                // channel 1 - string
+                // skip
+
+                // channel 2 - floating point
+                Assert.Equal(3.113, result2[0], precision: 3);
+                Assert.Equal(5.167, result2[72000 - 1], precision: 3);
+
+                // channel x - floating point, with NaN
+                Assert.Equal(-1.16, result3[251], precision: 3);
+                Assert.Equal(double.NaN, result3[252]);
+                Assert.Equal(double.NaN, result3[253]);
+                Assert.Equal(-1.17, result3[358], precision: 3);
             }
         }
 

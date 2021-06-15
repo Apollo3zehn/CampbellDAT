@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -377,7 +378,12 @@ namespace CampbellDAT
             if (variable.DataType == typeof(string))
                 throw new Exception("Variables of type 'string' cannot be read with this method.");
 
-            return this.ReadInternal<T>(variable, this.ReadUnmanagedInternal);
+            var methodInfo = typeof(CampbellFile).GetMethod(nameof(this.ReadInternalUnmanaged), BindingFlags.NonPublic | BindingFlags.Instance);
+            methodInfo = methodInfo.MakeGenericMethod(typeof(T), variable.DataType);
+            var result = ((DateTime[], CampbellData<T>))methodInfo.Invoke(this, new object[] { variable });
+
+
+            return result;
         }
 
         /// <summary>
@@ -389,40 +395,11 @@ namespace CampbellDAT
             if (variable.DataType != typeof(string))
                 throw new Exception("Only variables of type 'string' may be read with this method.");
 
-            return this.ReadInternal<string>(variable, this.ReadStringInternal);
+            return this.ReadInternalString(variable);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ReadUnmanagedInternal<T>(CampbellVariable variable, MemoryMappedViewAccessor accessor, long variableOffset, T[] buffer, long i) where T : unmanaged
-        {
-            Action? decode = variable.CampbellDataType switch
-            {
-                "IEEE4B" => () => buffer[i] = (T)(object)Utils.SwitchEndianness(accessor.ReadSingle(variableOffset)),
-                "FP2" => () => buffer[i] = (T)(object)accessor.ReadFloatingPoint2(variableOffset),
-                "FP4" => () => buffer[i] = (T)(object)accessor.ReadFloatingPoint4(variableOffset),
-                "BOOL2" => () => buffer[i] = (T)(object)accessor.ReadBool2(variableOffset),
-                "BOOL4" => () => buffer[i] = (T)(object)accessor.ReadBool4(variableOffset),
-                "NSec" => () => buffer[i] = (T)(object)accessor.ReadNSec(variableOffset),
-                "SecNano" => () => buffer[i] = (T)(object)accessor.ReadSecNano(variableOffset),
-                _ => null
-            };
-
-            if (decode is not null)
-                decode.Invoke();
-
-            else
-                accessor.Read(variableOffset, out buffer[i]);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ReadStringInternal(CampbellVariable variable, MemoryMappedViewAccessor accessor, long variableOffset, string[] buffer, long i)
-        {
-            var variableBuffer = new byte[variable.InFileDataTypeSize];
-            accessor.ReadArray(variableOffset, variableBuffer, 0, variableBuffer.Length);
-            buffer[i] = Encoding.ASCII.GetString(variableBuffer).TrimEnd('\0');
-        }
-
-        private (DateTime[] TimeStamps, CampbellData<T> Data) ReadInternal<T>(CampbellVariable variable, Action<CampbellVariable, MemoryMappedViewAccessor, long, T[], long> decoder)
+#warning This is mostly duplicated code.
+        private (DateTime[] TimeStamps, CampbellData<string> Data) ReadInternalString(CampbellVariable variable)
         {
             if (this.FrameRowCount > 1)
                 throw new Exception("Reading multi-row frames is not yet supported.");
@@ -440,7 +417,7 @@ namespace CampbellDAT
             using var accessor = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
 
             var timestamps = new DateTime[this.IntendedTableSize];
-            var buffer = new T[this.IntendedTableSize];
+            var buffer = new string[this.IntendedTableSize];
             var footerBuffer = new byte[4];
 
             /* for each frame */
@@ -505,7 +482,9 @@ namespace CampbellDAT
                 /* data */
                 var variableOffset = baseOffset + this.FrameHeaderSize + relativeVariableOffset;
 
-                decoder.Invoke(variable, accessor, variableOffset, buffer, i);
+                var variableBuffer = new byte[variable.InFileDataTypeSize];
+                accessor.ReadArray(variableOffset, variableBuffer, 0, variableBuffer.Length);
+                buffer[i] = Encoding.ASCII.GetString(variableBuffer).TrimEnd('\0');
             }
 
             if (i < this.IntendedTableSize - 1)
@@ -514,7 +493,140 @@ namespace CampbellDAT
                 buffer = buffer.AsSpan().Slice(0, i).ToArray();
             }
 
-            return (timestamps, new CampbellData<T>(variable, buffer));
+            return (timestamps, new CampbellData<string>(variable, buffer));
+        }
+
+#warning This is mostly duplicated code.
+        private (DateTime[] TimeStamps, CampbellData<TOut> Data) ReadInternalUnmanaged<TOut, TVariable>(CampbellVariable variable)
+             where TOut : unmanaged
+             where TVariable : unmanaged
+        {
+            if (this.FrameRowCount > 1)
+                throw new Exception("Reading multi-row frames is not yet supported.");
+
+            var index = _variables.IndexOf(variable);
+
+            if (index == -1)
+                throw new Exception("The provided variable does not belong to this file.");
+
+            var relativeVariableOffset = this.Variables
+                .Take(index)
+                .Sum(current => current.InFileDataTypeSize);
+
+            using var mmf = MemoryMappedFile.CreateFromFile(_fileStream, null, 0, MemoryMappedFileAccess.Read, HandleInheritability.None, leaveOpen: true);
+            using var accessor = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+
+            var timestamps = new DateTime[this.IntendedTableSize];
+            var byteSize = this.IntendedTableSize * Unsafe.SizeOf<TVariable>();
+            var result = this.GetBuffer<TOut>((ulong)byteSize);
+            var buffer = MemoryMarshal.Cast<TOut, TVariable>(result.AsSpan());
+            var footerBuffer = new byte[4];
+
+            /* for each frame */
+            int i = 0;
+
+            for (; i < this.IntendedTableSize; i++)
+            {
+                /* footer */
+                if (this.Format > Format.TOB1)
+                {
+#warning The flags are not validated since they are not part of the specification!
+
+                    var footerOffset = this.FirstFrameStart + this.FrameSize * i + this.FrameSize - this.FrameFooterSize;
+                    accessor.ReadArray(footerOffset, footerBuffer, 0, 4);
+
+                    var offset = ((footerBuffer[1] & 0x07) << 8) + footerBuffer[0];
+                    var fileMark = (footerBuffer[1] & 0x08) > 0;
+                    var cardRemoveAfterThisFrame = (footerBuffer[1] & 0x10) > 0;
+                    var noRecord = (footerBuffer[1] & 0x20) > 0;
+                    var isMinorFrame = (footerBuffer[1] & 0x40) > 0;
+                    var validation = (footerBuffer[3] << 8) + footerBuffer[2];
+
+                    if (this.ValidationStamp != validation)
+                        break;
+
+                    if (cardRemoveAfterThisFrame)
+                        break;
+
+                    if (noRecord)
+                        throw new Exception("Reading incomplete files is not yet supported.");
+
+                    if (isMinorFrame)
+                        throw new Exception("Reading minor frames is not yet supported.");
+                }
+
+                /* header */
+                var baseOffset = this.FirstFrameStart + this.FrameSize * i;
+
+                if (this.Format > Format.TOB1)
+                {
+#warning "The timestamp and record number for each record are an optional output in a TOB1 file. If these elements are present, a "SECONDS", "NANOSECONDS", and "RECORD" column will be generated as names in the field list of header line two".
+
+                    var offset = Utils.TO_UNIX_EPOCH + accessor.ReadInt32(baseOffset);
+                    var subseconds = accessor.ReadInt32(baseOffset + 4);
+
+                    timestamps[i] = DateTimeOffset
+                        .FromUnixTimeSeconds(offset)
+                        .AddSeconds(subseconds * this.FrameTimeResolution)
+                        .UtcDateTime;
+
+                    // check if data is in order
+                    if (i > 0 && timestamps[i - 1] > timestamps[i])
+                        throw new Exception("Reading unordered frames is not yet supported.");
+                }
+
+                // record number of the frame
+                if (this.Format == Format.TOB3)
+                {
+                    var recordNumber = accessor.ReadInt32(baseOffset + 8);
+                }
+
+                /* data */
+                var variableOffset = baseOffset + this.FrameHeaderSize + relativeVariableOffset;
+
+                switch (variable.CampbellDataType)
+                {
+                    case "IEEE4B":
+                        buffer[i] = (TVariable)(object)Utils.SwitchEndianness(accessor.ReadSingle(variableOffset));
+                        break;
+
+                    case "FP2":
+                        buffer[i] = (TVariable)(object)accessor.ReadFloatingPoint2(variableOffset);
+                        break;
+
+                    case "FP4":
+                        buffer[i] = (TVariable)(object)accessor.ReadFloatingPoint4(variableOffset);
+                        break;
+
+                    case "BOOL2":
+                        buffer[i] = (TVariable)(object)accessor.ReadBool2(variableOffset);
+                        break;
+
+                    case "BOOL4":
+                        buffer[i] = (TVariable)(object)accessor.ReadBool4(variableOffset);
+                        break;
+
+                    case "NSec":
+                        buffer[i] = (TVariable)(object)accessor.ReadNSec(variableOffset);
+                        break;
+
+                    case "SecNano":
+                        buffer[i] = (TVariable)(object)accessor.ReadSecNano(variableOffset);
+                        break;
+
+                    default:
+                        accessor.Read(variableOffset, out buffer[i]);
+                        break;
+                }
+            }
+
+            if (i < this.IntendedTableSize - 1)
+            {
+                timestamps = timestamps.AsSpan().Slice(0, i).ToArray();
+                buffer = buffer.Slice(0, i).ToArray();
+            }
+
+            return (timestamps, new CampbellData<TOut>(variable, result));
         }
 
         /// <summary>
@@ -523,6 +635,22 @@ namespace CampbellDAT
         public void Dispose()
         {
             _streamReader?.Dispose();
+        }
+
+        private T[] GetBuffer<T>(ulong byteSize)
+            where T : unmanaged
+        {
+            // convert file type (e.g. 2 bytes) to T (e.g. custom struct with 35 bytes)
+            var sizeOfT = (ulong)Unsafe.SizeOf<T>();
+
+            if (byteSize % sizeOfT != 0)
+                throw new Exception("The size of the target buffer (number of selected elements times the datasets data-type byte size) must be a multiple of the byte size of the generic parameter T.");
+
+            var arraySize = byteSize / sizeOfT;
+
+            // create the buffer
+            var result = new T[arraySize];
+            return result;
         }
 
         #endregion
