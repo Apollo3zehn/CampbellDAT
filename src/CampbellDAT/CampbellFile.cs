@@ -517,7 +517,13 @@ namespace CampbellDAT
             using var accessor = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
 
             var timestamps = new DateTime[this.IntendedTableSize];
-            var byteSize = this.IntendedTableSize * Unsafe.SizeOf<TVariable>();
+            var byteSize = default(int);
+
+            unsafe
+            {
+                byteSize = this.IntendedTableSize * sizeof(TVariable);
+            }
+
             var result = this.GetBuffer<TOut>((ulong)byteSize);
             var buffer = MemoryMarshal.Cast<TOut, TVariable>(result.AsSpan());
             var footerBuffer = new byte[4];
@@ -641,16 +647,19 @@ namespace CampbellDAT
             where T : unmanaged
         {
             // convert file type (e.g. 2 bytes) to T (e.g. custom struct with 35 bytes)
-            var sizeOfT = (ulong)Unsafe.SizeOf<T>();
+            unsafe
+            {
+                var sizeOfT = (ulong)sizeof(T);
 
-            if (byteSize % sizeOfT != 0)
-                throw new Exception("The size of the target buffer (number of selected elements times the datasets data-type byte size) must be a multiple of the byte size of the generic parameter T.");
+                if (byteSize % sizeOfT != 0)
+                    throw new Exception("The size of the target buffer (number of selected elements times the datasets data-type byte size) must be a multiple of the byte size of the generic parameter T.");
 
-            var arraySize = byteSize / sizeOfT;
+                var arraySize = byteSize / sizeOfT;
 
-            // create the buffer
-            var result = new T[arraySize];
-            return result;
+                // create the buffer
+                var result = new T[arraySize];
+                return result;
+            }
         }
 
         #endregion
