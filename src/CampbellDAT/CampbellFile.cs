@@ -629,7 +629,7 @@ namespace CampbellDAT
             if (i < this.IntendedTableSize - 1)
             {
                 timestamps = timestamps.AsSpan().Slice(0, i).ToArray();
-                buffer = buffer.Slice(0, i).ToArray();
+                result = MemoryMarshal.Cast<TVariable, TOut>(buffer.Slice(0, i)).ToArray();
             }
 
             return (timestamps, new CampbellData<TOut>(variable, result));

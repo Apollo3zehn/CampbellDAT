@@ -64,18 +64,21 @@ namespace CampbellDAT.Tests
                 // Assert
 
                 // channel 1 - string
+                Assert.Equal(72000, result1.Data.Buffer.Length);
                 Assert.Equal(new DateTime(2021, 02, 08, 19, 00, 00, 50, DateTimeKind.Utc), result1.TimeStamps[0]);
                 Assert.Equal(new DateTime(2021, 02, 08, 20, 00, 00, 00, DateTimeKind.Utc), result1.TimeStamps[72000 - 1]);
                 Assert.Equal("Q", result1.Data.Buffer[0]);
                 Assert.Equal("Q", result1.Data.Buffer[72000 - 1]);
 
                 // channel 2 - floating point
+                Assert.Equal(72000, result2.Data.Buffer.Length);
                 Assert.Equal(new DateTime(2021, 02, 08, 19, 00, 00, 50, DateTimeKind.Utc), result2.TimeStamps[0]);
                 Assert.Equal(new DateTime(2021, 02, 08, 20, 00, 00, 00, DateTimeKind.Utc), result2.TimeStamps[72000 - 1]);
                 Assert.Equal(3.113, result2.Data.Buffer[0], precision: 3);
                 Assert.Equal(5.167, result2.Data.Buffer[72000 - 1], precision: 3);
 
                 // channel x - floating point, with NaN
+                Assert.Equal(72000, result3.Data.Buffer.Length);
                 Assert.Equal(new DateTime(2021, 02, 08, 19, 00, 00, 50, DateTimeKind.Utc), result3.TimeStamps[0]);
                 Assert.Equal(new DateTime(2021, 02, 08, 20, 00, 00, 00, DateTimeKind.Utc), result3.TimeStamps[72000 - 1]);
                 Assert.Equal(-1.16, result3.Data.Buffer[251], precision: 3);
@@ -105,10 +108,12 @@ namespace CampbellDAT.Tests
                 // skip
 
                 // channel 2 - floating point
+                Assert.Equal(72000, result2.Length);
                 Assert.Equal(3.113, result2[0], precision: 3);
                 Assert.Equal(5.167, result2[72000 - 1], precision: 3);
 
                 // channel x - floating point, with NaN
+                Assert.Equal(72000, result3.Length);
                 Assert.Equal(-1.16, result3[251], precision: 3);
                 Assert.Equal(double.NaN, result3[252]);
                 Assert.Equal(double.NaN, result3[253]);
