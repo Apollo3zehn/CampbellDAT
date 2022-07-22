@@ -1,6 +1,6 @@
 # CampbellDAT
 
-[![AppVeyor](https://ci.appveyor.com/api/projects/status/github/apollo3zehn/campbelldat?svg=true)](https://ci.appveyor.com/project/Apollo3zehn/campbelldat) [![NuGet](https://img.shields.io/nuget/vpre/CampbellDAT.svg?label=Nuget)](https://www.nuget.org/packages/CampbellDAT)
+[![GitHub Actions](https://github.com/Apollo3zehn/CampbellDAT/actions/workflows/build-and-publish.yml/badge.svg)](https://github.com/Apollo3zehn/CampbellDAT/actions) [![NuGet](https://img.shields.io/nuget/vpre/CampbellDAT.svg?label=Nuget)](https://www.nuget.org/packages/CampbellDAT)
 
 CampbellDAT is a simple and feature-limited library that provides a reader for Campbell files stored in the TOB1, TOB2 or TOB3 format (.dat).
 
