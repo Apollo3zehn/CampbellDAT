@@ -4,9 +4,13 @@
     <Description>A simple and feature-limited reader for Campbell DAT files (TOB1, TOB2, TOB3).</Description>
     <PackageTags>Campbell DAT TOB1 TOB2 TOB3</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Nullable>enable</Nullable>
     <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+    <PackageReadmeFile>README.md</PackageReadmeFile>    
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
     <PackageReference Include="System.Memory" Version="4.5.4" />
