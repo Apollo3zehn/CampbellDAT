@@ -126,7 +126,7 @@ namespace CampbellDAT.Tests
         [InlineData(0xff_9f, float.NegativeInfinity)]
         [InlineData(0xfe_9f, float.NaN)]
         [InlineData(0x29_6c, 3.113)]
-        public void CanDecodeFP2(ulong value, float expected)
+        public void CanDecodeFP2(uint value, float expected)
         {
             // Arrange
             using var mmf = MemoryMappedFile.CreateNew(default, 2, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
