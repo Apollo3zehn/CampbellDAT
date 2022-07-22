@@ -130,10 +130,10 @@ namespace CampbellDAT.Tests
         {
             // Arrange
             using var mmf = MemoryMappedFile.CreateNew(default, 2, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
-            using var accessorWrite = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Write);
+            using var accessorWrite = mmf.CreateViewAccessor(0, 2, MemoryMappedFileAccess.Write);
             accessorWrite.Write(0, value);
 
-            using var accessorRead = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+            using var accessorRead = mmf.CreateViewAccessor(0, 2, MemoryMappedFileAccess.Read);
 
             // Act
             var actual = MemoryMappedViewAccessorExtensions.ReadFloatingPoint2(accessorRead, 0);
@@ -149,10 +149,10 @@ namespace CampbellDAT.Tests
         {
             // Arrange
             using var mmf = MemoryMappedFile.CreateNew(default, 4, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
-            using var accessorWrite = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Write);
+            using var accessorWrite = mmf.CreateViewAccessor(0, 4, MemoryMappedFileAccess.Write);
             accessorWrite.Write(0, value);
 
-            using var accessorRead = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+            using var accessorRead = mmf.CreateViewAccessor(0, 4, MemoryMappedFileAccess.Read);
 
             // Act
             var actual = MemoryMappedViewAccessorExtensions.ReadFloatingPoint4(accessorRead, 0);
