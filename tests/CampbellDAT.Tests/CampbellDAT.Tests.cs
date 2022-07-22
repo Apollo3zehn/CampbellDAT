@@ -129,7 +129,7 @@ namespace CampbellDAT.Tests
         public void CanDecodeFP2(ulong value, float expected)
         {
             // Arrange
-            using var mmf = MemoryMappedFile.CreateNew(Guid.NewGuid().ToString(), 2, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
+            using var mmf = MemoryMappedFile.CreateNew(default, 2, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
             using var accessorWrite = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Write);
             accessorWrite.Write(0, value);
 
@@ -148,7 +148,7 @@ namespace CampbellDAT.Tests
         public void CanDecodeFP4(ulong value, float expected)
         {
             // Arrange
-            using var mmf = MemoryMappedFile.CreateNew(Guid.NewGuid().ToString(), 4, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
+            using var mmf = MemoryMappedFile.CreateNew(default, 4, MemoryMappedFileAccess.ReadWrite, MemoryMappedFileOptions.None, HandleInheritability.None);
             using var accessorWrite = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Write);
             accessorWrite.Write(0, value);
 
